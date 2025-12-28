@@ -23,10 +23,7 @@ app.get("/", (req, res) => {
   res.render("index");
 });
 
-/* ------------------ SOCKET ------------------ */
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
   if (!players.white) {
     players.white = socket.id;
     socket.emit("playerRole", "w");
@@ -44,43 +41,43 @@ io.on("connection", (socket) => {
       (chess.turn() === "w" && socket.id !== players.white) ||
       (chess.turn() === "b" && socket.id !== players.black)
     ) {
+      socket.emit("invalidMove");
       return;
     }
 
     const result = chess.move(move);
-    if (!result) return;
 
-    io.emit("move", move);
+    if (!result) {
+      socket.emit("invalidMove");
+      return;
+    }
+
     io.emit("boardState", chess.fen());
 
     if (chess.isCheckmate()) {
       const winner = chess.turn() === "w" ? "Black" : "White";
       io.emit("gameOver", { result: "checkmate", winner });
-    } else if (chess.isDraw() || chess.isStalemate()) {
-      io.emit("gameOver", { result: "draw" });
     }
   });
 
   socket.on("restartGame", () => {
     chess.reset();
     io.emit("boardState", chess.fen());
-    io.emit("gameRestarted");
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-
     if (socket.id === players.white) players.white = null;
     if (socket.id === players.black) players.black = null;
 
+    io.emit("opponentLeft");
     updateConnectionStatus();
   });
 });
 
-/* ------------------ STATUS ------------------ */
 function updateConnectionStatus() {
   if (players.white && players.black) {
     io.emit("connected");
+    io.emit("boardState", chess.fen()); // 🔥 THIS FIXES THE ISSUE
   } else {
     io.emit("waiting");
   }
