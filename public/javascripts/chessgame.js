@@ -1,13 +1,17 @@
 const socket = io();
 const chess = new Chess();
 const boardElement = document.querySelector(".chessboard");
+const statusElement = document.getElementById("turnStatus");
+
 let draggedPiece = null;
 let sourceSquare = null;
 let playerRole = null;
 
+/* ------------------ RENDER BOARD ------------------ */
 const renderBoard = () => {
   const board = chess.board();
   boardElement.innerHTML = "";
+
   board.forEach((row, rowindex) => {
     row.forEach((square, squareindex) => {
       const squareElement = document.createElement("div");
@@ -15,6 +19,7 @@ const renderBoard = () => {
         "square",
         (rowindex + squareindex) % 2 === 0 ? "light" : "dark"
       );
+
       squareElement.dataset.row = rowindex;
       squareElement.dataset.column = squareindex;
 
@@ -24,117 +29,140 @@ const renderBoard = () => {
           "piece",
           square.color === "w" ? "white" : "black"
         );
+
         pieceElement.innerText = getPieceUnicode(square);
         pieceElement.draggable = playerRole === square.color;
 
         pieceElement.addEventListener("dragstart", (e) => {
-          if (pieceElement.draggable) {
-            draggedPiece = pieceElement;
-            sourceSquare = { row: rowindex, column: squareindex };
-            e.dataTransfer.setData("text/plain", "");
-          }
+          if (!pieceElement.draggable) return;
+          draggedPiece = pieceElement;
+          sourceSquare = { row: rowindex, column: squareindex };
+          e.dataTransfer.setData("text/plain", "");
         });
 
-        pieceElement.addEventListener("dragend", (e) => {
+        pieceElement.addEventListener("dragend", () => {
           draggedPiece = null;
           sourceSquare = null;
         });
+
         squareElement.appendChild(pieceElement);
       }
 
-      squareElement.addEventListener("dragover", function (e) {
-        e.preventDefault();
-      });
-      squareElement.addEventListener("drop", function (e) {
-        e.preventDefault();
-        if (draggedPiece) {
-          const targetSource = {
-            row: parseInt(squareElement.dataset.row),
-            column: parseInt(squareElement.dataset.column),
-          };
+      squareElement.addEventListener("dragover", (e) => e.preventDefault());
 
-          handleMove(sourceSquare, targetSource);
-        }
+      squareElement.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (!draggedPiece || !sourceSquare) return;
+
+        const targetSquare = {
+          row: parseInt(squareElement.dataset.row),
+          column: parseInt(squareElement.dataset.column),
+        };
+
+        handleMove(sourceSquare, targetSquare);
       });
+
       boardElement.appendChild(squareElement);
     });
   });
-  if (playerRole === "b") {
-    boardElement.classList.add("flipped");
-  } else {
-    boardElement.classList.remove("flipped");
-  }
+
+  if (playerRole === "b") boardElement.classList.add("flipped");
+  else boardElement.classList.remove("flipped");
 };
+
+/* ------------------ MOVE HANDLING ------------------ */
 const handleMove = (source, target) => {
   const move = {
     from: `${String.fromCharCode(97 + source.column)}${8 - source.row}`,
     to: `${String.fromCharCode(97 + target.column)}${8 - target.row}`,
     promotion: "q",
   };
+
   socket.emit("move", move);
 };
-const getPieceUnicode = (piece) => {
-  const unicodePieces = {
-    p: "♟", // black pawn
-    r: "♜", // black rook
-    n: "♞", // black knight
-    b: "♝", // black bishop
-    q: "♛", // black queen
-    k: "♚", // black king
 
-    P: "♙", // white pawn
-    R: "♖", // white rook
-    N: "♘", // white knight
-    B: "♗", // white bishop
-    Q: "♕", // white queen
-    K: "♔", // white king
+/* ------------------ PIECES ------------------ */
+const getPieceUnicode = (piece) => {
+  const pieces = {
+    p: "♟",
+    r: "♜",
+    n: "♞",
+    b: "♝",
+    q: "♛",
+    k: "♚",
+    P: "♙",
+    R: "♖",
+    N: "♘",
+    B: "♗",
+    Q: "♕",
+    K: "♔",
   };
-  return unicodePieces[piece.type] || "";
+  return pieces[piece.type] || "";
 };
 
-socket.on("playerRole", function (role) {
+/* ------------------ SOCKET EVENTS ------------------ */
+socket.on("playerRole", (role) => {
   playerRole = role;
   renderBoard();
 });
-socket.on("spectatorRole", function () {
+
+socket.on("spectatorRole", () => {
   playerRole = null;
+  statusElement.innerText = "Spectating";
   renderBoard();
 });
-socket.on("boardState", function (fen) {
+
+socket.on("waiting", () => {
+  statusElement.innerText = "Waiting for opponent...";
+});
+
+socket.on("connected", () => {
+  statusElement.innerText = "Opponent connected";
+});
+
+socket.on("boardState", (fen) => {
   chess.load(fen);
+
+  if (playerRole) {
+    statusElement.innerText =
+      chess.turn() === playerRole ? "Your turn" : "Opponent's turn";
+  }
+
   renderBoard();
 });
-socket.on("move", function (move) {
+
+socket.on("move", (move) => {
   chess.move(move);
   renderBoard();
 });
+
 socket.on("gameOver", ({ result, winner }) => {
-  const gameOverMessage = document.getElementById("gameOverMessage");
-  const gameOverTitle = document.getElementById("gameOverTitle");
-  const gameOverResult = document.getElementById("gameOverResult");
+  const overlay = document.getElementById("gameOverMessage");
+  const title = document.getElementById("gameOverTitle");
+  const text = document.getElementById("gameOverResult");
 
   if (result === "checkmate") {
-    gameOverTitle.innerText = "Checkmate!";
-    gameOverResult.innerText = `${winner} wins the game 🎉`;
-  } else if (result === "stalemate") {
-    gameOverTitle.innerText = "Stalemate!";
-    gameOverResult.innerText = "The game ended in a draw 🤝";
-  } else if (result === "draw") {
-    gameOverTitle.innerText = "Draw!";
-    gameOverResult.innerText = "The game ended in a draw 🤝";
+    title.innerText = "Checkmate!";
+    text.innerText = `${winner} wins the game 🎉`;
+  } else {
+    title.innerText = "Draw!";
+    text.innerText = "The game ended in a draw 🤝";
   }
 
-  gameOverMessage.classList.remove("hidden");
+  overlay.classList.remove("hidden");
 });
+
 socket.on("gameRestarted", () => {
+  statusElement.innerText = "Game restarted";
   renderBoard();
 });
+
+/* ------------------ RESTART ------------------ */
 function restartGame() {
   socket.emit("restartGame");
   document.getElementById("gameOverMessage").classList.add("hidden");
 }
 
-// make it available for inline onclick
 window.restartGame = restartGame;
 
 renderBoard();

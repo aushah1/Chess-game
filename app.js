@@ -1,83 +1,91 @@
 const express = require("express");
-const app = express();
-const port = 3000;
-
-const socket = require("socket.io");
 const http = require("http");
+const socketIO = require("socket.io");
 const { Chess } = require("chess.js");
 const path = require("path");
 
+const app = express();
 const server = http.createServer(app);
-const io = socket(server);
+const io = socketIO(server);
 const chess = new Chess();
 
-let player = {};
-let currentPlayer = "w";
+const port = 3000;
+
+let players = {
+  white: null,
+  black: null,
+};
 
 app.set("view engine", "ejs");
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (req, res) => {
-  res.render("index", { title: "Chess Game" });
+  res.render("index");
 });
 
-io.on("connection", (uniquesocket) => {
-  console.log("Connected");
+/* ------------------ SOCKET ------------------ */
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
 
-  if (!player.white) {
-    player.white = uniquesocket.id;
-    uniquesocket.emit("playerRole", "w");
-  } else if (!player.black) {
-    player.black = uniquesocket.id;
-    uniquesocket.emit("playerRole", "b");
+  if (!players.white) {
+    players.white = socket.id;
+    socket.emit("playerRole", "w");
+  } else if (!players.black) {
+    players.black = socket.id;
+    socket.emit("playerRole", "b");
   } else {
-    uniquesocket.emit("spectatorRole");
+    socket.emit("spectatorRole");
   }
-  uniquesocket.on("disconnect", () => {
-    if (uniquesocket.id === player.white) {
-      delete player.white;
-    } else if (uniquesocket.id === player.black) {
-      delete player.black;
+
+  updateConnectionStatus();
+
+  socket.on("move", (move) => {
+    if (
+      (chess.turn() === "w" && socket.id !== players.white) ||
+      (chess.turn() === "b" && socket.id !== players.black)
+    ) {
+      return;
+    }
+
+    const result = chess.move(move);
+    if (!result) return;
+
+    io.emit("move", move);
+    io.emit("boardState", chess.fen());
+
+    if (chess.isCheckmate()) {
+      const winner = chess.turn() === "w" ? "Black" : "White";
+      io.emit("gameOver", { result: "checkmate", winner });
+    } else if (chess.isDraw() || chess.isStalemate()) {
+      io.emit("gameOver", { result: "draw" });
     }
   });
-  uniquesocket.on("move", (move) => {
-    try {
-      if (chess.turn() === "w" && uniquesocket.id !== player.white) return;
-      if (chess.turn() === "b" && uniquesocket.id !== player.black) return;
 
-      const result = chess.move(move);
-      if (result) {
-        currentPlayer = chess.turn();
-        io.emit("move", move);
-        io.emit("boardState", chess.fen());
-
-        if (chess.isCheckmate()) {
-          const winner = chess.turn() === "w" ? "Black" : "White";
-          io.emit("gameOver", { result: "checkmate", winner });
-        }
-
-        // (optional) also handle stalemate/draw
-        else if (chess.isStalemate()) {
-          io.emit("gameOver", { result: "stalemate", winner: null });
-        } else if (chess.isDraw()) {
-          io.emit("gameOver", { result: "draw", winner: null });
-        }
-      } else {
-        console.log("Invalid move :", move);
-        uniquesocket.emit("invalidMove :", move);
-      }
-    } catch (err) {
-      console.log(err);
-      uniquesocket.emit("Invalid move :", move);
-    }
-  });
-  uniquesocket.on("restartGame", () => {
+  socket.on("restartGame", () => {
     chess.reset();
     io.emit("boardState", chess.fen());
     io.emit("gameRestarted");
   });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+
+    if (socket.id === players.white) players.white = null;
+    if (socket.id === players.black) players.black = null;
+
+    updateConnectionStatus();
+  });
 });
 
+/* ------------------ STATUS ------------------ */
+function updateConnectionStatus() {
+  if (players.white && players.black) {
+    io.emit("connected");
+  } else {
+    io.emit("waiting");
+  }
+}
+
 server.listen(port, () => {
-  console.log(`listening on http://localhost:${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });

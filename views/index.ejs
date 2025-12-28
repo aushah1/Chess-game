@@ -3,40 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Online Chess</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
+
   <style>
     * {
       font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans Symbols",
         sans-serif;
     }
+
+    body {
+      background: radial-gradient(circle at top, #2a2a2a, #0f0f0f);
+    }
+
     .chessboard {
       display: grid;
-      grid-template-columns: repeat(8, minmax(0, 1fr));
-      grid-template-rows: repeat(8, minmax(0, 1fr));
-      width: 400px;
-      height: 400px;
-      transform: rotate(0deg);
-    }
-
-    .piece.white {
-      color: white;
-      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 1));
-    }
-
-    .piece.black {
-      color: black;
-    }
-
-    .flipped {
-      transform: rotate(180deg);
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      width: 420px;
+      height: 420px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+      background: #000;
+      transition: transform 0.4s ease;
     }
 
     .square {
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.2s ease;
     }
 
     .square.light {
@@ -47,54 +45,106 @@
       background-color: #b58863;
     }
 
-    .piece {
-      font-size: 36px;
-      cursor: pointer;
-      user-select: none;
+    .square:hover {
+      filter: brightness(1.08);
     }
 
-    .piece.draggable {
+    .piece {
+      font-size: 38px;
       cursor: grab;
+      user-select: none;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    .piece:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+
+    .piece.white {
+      color: #ffffff;
+      filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.9));
+    }
+
+    .piece.black {
+      color: #111;
     }
 
     .dragging {
       opacity: 0.5;
     }
 
-    /* Rotate pieces for black player */
+    .flipped {
+      transform: rotate(180deg);
+    }
+
     .flipped .piece {
       transform: rotate(180deg);
     }
   </style>
-  <body>
-    <div
-      class="w-full h-screen bg-zinc-800 flex items-center justify-center relative">
-      <div class="chessboard w-96 h-96"></div>
 
+  <body>
+    <div class="min-h-screen flex items-center justify-center px-4">
       <div
-        id="gameOverMessage"
-        class="hidden absolute top-0 left-0 w-full h-full bg-black/70 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-xl text-center">
-          <h2 class="text-2xl font-bold mb-4" id="gameOverTitle">Game Over</h2>
-          <p class="text-lg mb-4" id="gameOverResult"></p>
+        class="w-full max-w-xl bg-zinc-900/70 backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-4">
+          <h1 class="text-white text-2xl font-bold tracking-wide">
+            ♟ Online Chess
+          </h1>
+          <span
+            class="px-3 py-1 text-sm rounded-full bg-zinc-700 text-zinc-200">
+            Live Match
+          </span>
+        </div>
+
+        <!-- Board -->
+        <div class="flex justify-center">
+          <div class="chessboard"></div>
+        </div>
+
+        <!-- Status -->
+        <div
+          class="mt-4 flex items-center justify-between text-sm text-zinc-300">
+          <span id="turnStatus">White to move</span>
           <button
             onclick="restartGame()"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            New Game
+            class="px-3 py-1 rounded-lg bg-zinc-700 hover:bg-zinc-600 transition">
+            Restart
           </button>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div
+          id="gameOverMessage"
+          class="hidden absolute inset-0 bg-black/80 flex items-center justify-center z-50 rounded-2xl">
+          <div
+            class="bg-white p-6 rounded-xl shadow-2xl text-center w-[90%] max-w-sm">
+            <h2
+              class="text-2xl font-bold mb-3 text-zinc-900"
+              id="gameOverTitle">
+              Game Over
+            </h2>
+            <p class="text-lg mb-5 text-zinc-700" id="gameOverResult"></p>
+            <button
+              onclick="restartGame()"
+              class="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+              New Game
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
+    <!-- Libraries -->
     <script
       src="https://cdn.socket.io/4.8.1/socket.io.min.js"
-      integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
       crossorigin="anonymous"></script>
+
     <script
       src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"
-      integrity="sha512-xRllwz2gdZciIB+AkEbeq+gVhX8VB8XsfqeFbUh+SzHlN96dEduwtTuVuc2u9EROlmW9+yhRlxjif66ORpsgVA=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"></script>
+      crossorigin="anonymous"></script>
+
     <script src="/javascripts/chessgame.js"></script>
   </body>
 </html>
