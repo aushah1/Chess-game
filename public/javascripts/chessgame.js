@@ -9,7 +9,7 @@ let playerRole = null;
 let opponentConnected = false;
 
 /* ------------------ RENDER BOARD ------------------ */
-const renderBoard = () => {
+function renderBoard() {
   const board = chess.board();
   boardElement.innerHTML = "";
 
@@ -18,7 +18,7 @@ const renderBoard = () => {
       const squareElement = document.createElement("div");
       squareElement.classList.add(
         "square",
-        (r + c) % 2 === 0 ? "light" : "dark"
+        (r + c) % 2 === 0 ? "light" : "dark",
       );
 
       squareElement.dataset.row = r;
@@ -28,7 +28,7 @@ const renderBoard = () => {
         const pieceElement = document.createElement("div");
         pieceElement.classList.add(
           "piece",
-          square.color === "w" ? "white" : "black"
+          square.color === "w" ? "white" : "black",
         );
 
         pieceElement.innerText = getPieceUnicode(square);
@@ -70,10 +70,10 @@ const renderBoard = () => {
 
   if (playerRole === "b") boardElement.classList.add("flipped");
   else boardElement.classList.remove("flipped");
-};
+}
 
 /* ------------------ MOVE ------------------ */
-const handleMove = (source, target) => {
+function handleMove(source, target) {
   if (!opponentConnected) return;
 
   const move = {
@@ -83,10 +83,10 @@ const handleMove = (source, target) => {
   };
 
   socket.emit("move", move);
-};
+}
 
 /* ------------------ PIECES ------------------ */
-const getPieceUnicode = (piece) => {
+function getPieceUnicode(piece) {
   const pieces = {
     p: "♟",
     r: "♜",
@@ -102,7 +102,7 @@ const getPieceUnicode = (piece) => {
     K: "♔",
   };
   return pieces[piece.type] || "";
-};
+}
 
 /* ------------------ SOCKET EVENTS ------------------ */
 socket.on("playerRole", (role) => {
@@ -140,23 +140,13 @@ socket.on("boardState", (fen) => {
   renderBoard();
 });
 
-socket.on("invalidMove", () => {
-  statusElement.innerText = "Invalid move";
-  renderBoard();
-});
-
 socket.on("gameOver", ({ result, winner }) => {
   const overlay = document.getElementById("gameOverMessage");
   const title = document.getElementById("gameOverTitle");
   const text = document.getElementById("gameOverResult");
 
-  if (result === "checkmate") {
-    title.innerText = "Checkmate!";
-    text.innerText = `${winner} wins the game`;
-  } else {
-    title.innerText = "Game ended";
-    text.innerText = "Draw";
-  }
+  title.innerText = "Checkmate!";
+  text.innerText = `${winner} wins the game`;
 
   overlay.classList.remove("hidden");
 });

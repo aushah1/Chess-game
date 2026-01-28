@@ -41,22 +41,22 @@ io.on("connection", (socket) => {
       (chess.turn() === "w" && socket.id !== players.white) ||
       (chess.turn() === "b" && socket.id !== players.black)
     ) {
-      socket.emit("invalidMove");
       return;
     }
 
-    const result = chess.move(move);
+    try {
+      const result = chess.move(move);
 
-    if (!result) {
-      socket.emit("invalidMove");
+      if (!result) return;
+
+      io.emit("boardState", chess.fen());
+
+      if (chess.isCheckmate()) {
+        const winner = chess.turn() === "w" ? "Black" : "White";
+        io.emit("gameOver", { result: "checkmate", winner });
+      }
+    } catch (err) {
       return;
-    }
-
-    io.emit("boardState", chess.fen());
-
-    if (chess.isCheckmate()) {
-      const winner = chess.turn() === "w" ? "Black" : "White";
-      io.emit("gameOver", { result: "checkmate", winner });
     }
   });
 
@@ -77,7 +77,7 @@ io.on("connection", (socket) => {
 function updateConnectionStatus() {
   if (players.white && players.black) {
     io.emit("connected");
-    io.emit("boardState", chess.fen()); // 🔥 THIS FIXES THE ISSUE
+    io.emit("boardState", chess.fen());
   } else {
     io.emit("waiting");
   }
